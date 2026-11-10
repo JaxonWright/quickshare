@@ -1,20 +1,4 @@
-```text
-           ▄▄▄▄▄▄▄▄▄▄▄▄
-       ▄▄████████████████▄▄
-    ▄█████▀▀          ▀▀█████▄
-   ████▀     ▄            ▀████▄
- ▄███▀      ███▄▄           ▀███▄
- █████████████████▄          ▀███▄
- ▀▀▀▀▀▀▀▀▀▀▀█████▀            ████
- ▄▄         ███▀  ▄███         ▀█▀
-████            ▄█████▄▄▄▄▄▄▄▄▄▄▄
- ███▄          ▀█████████████████
- ▀███▄           ▀▀███      ▄███▀
-   ▀███▄            ▀     ▄███▀
-     ▀████▄▄▄        ▄▄▄████▀
-       ▀▀████████████████▀▀
-             ▀▀▀▀▀▀▀▀
-```
+<img src="assets/logo.png" width="168" height="140" alt="Quick Share mark drawn in ASCII characters">
 
 # quickshare
 
@@ -133,4 +117,4 @@ The phone's settings have no switch for this. There are two workarounds:
 
 GPL-3.0-only, because rqs_lib is GPL-3.0. See `LICENSE`.
 
-Quick Share is a trademark of Google. The mark at the top of this file is drawn from Google's icon, and this project is not affiliated with Google.
+Quick Share is a trademark of Google. The mark at the top of this file is drawn from Google's icon in ASCII characters, and this project is not affiliated with Google.
