@@ -132,3 +132,5 @@ The phone's settings have no switch for this. There are two workarounds:
 ## License
 
 GPL-3.0-only, because rqs_lib is GPL-3.0. See `LICENSE`.
+
+Quick Share is a trademark of Google. The mark at the top of this file is drawn from Google's icon, and this project is not affiliated with Google.
