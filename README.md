@@ -1,3 +1,21 @@
+```text
+           ▄▄▄▄▄▄▄▄▄▄▄▄
+       ▄▄████████████████▄▄
+    ▄█████▀▀          ▀▀█████▄
+   ████▀     ▄            ▀████▄
+ ▄███▀      ███▄▄           ▀███▄
+ █████████████████▄          ▀███▄
+ ▀▀▀▀▀▀▀▀▀▀▀█████▀            ████
+ ▄▄         ███▀  ▄███         ▀█▀
+████            ▄█████▄▄▄▄▄▄▄▄▄▄▄
+ ███▄          ▀█████████████████
+ ▀███▄           ▀▀███      ▄███▀
+   ▀███▄            ▀     ▄███▀
+     ▀████▄▄▄        ▄▄▄████▀
+       ▀▀████████████████▀▀
+             ▀▀▀▀▀▀▀▀
+```
+
 # quickshare
 
 A command-line client for Android Quick Share on Linux. It lists nearby devices, sends files to an Android phone, and receives files from one. Every command can print one JSON object per line, so a file manager, a bar widget or a script can drive it without linking to it. [flea-quickshare](https://github.com/JaxonWright/flea-quickshare) uses it to add Quick Share to the [Flea](https://github.com/thisisgm/flea) file menu.
