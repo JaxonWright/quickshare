@@ -13,6 +13,8 @@ use tokio::io::AsyncBufReadExt;
 use tokio::sync::broadcast;
 use tokio::time::Instant;
 
+mod doctor;
+
 #[derive(Parser)]
 #[command(name = "quickshare", version, about = "Send and receive files with Android Quick Share")]
 struct Cli {
@@ -54,17 +56,25 @@ enum Command {
         #[arg(long, default_value_t = 53318)]
         port: u16,
     },
+    /// Check Bluetooth, the firewall, the download folder and connected phones.
+    Doctor {
+        #[arg(long)]
+        dir: Option<PathBuf>,
+        #[arg(long, default_value_t = 53318)]
+        port: u16,
+    },
 }
 
 #[derive(Serialize)]
 #[serde(tag = "t", rename_all = "lowercase")]
-enum Event<'a> {
+pub(crate) enum Event<'a> {
     Device { id: &'a str, name: &'a str, kind: &'static str, addr: &'a str },
     Gone { id: &'a str },
     Request { id: &'a str, from: &'a str, pin: &'a str, files: &'a [String], bytes: u64 },
     Progress { id: &'a str, done: u64, total: u64 },
     Received { id: &'a str, files: &'a [String], dir: &'a str },
     Result { id: &'a str, code: Outcome },
+    Check { name: &'a str, status: doctor::Status, detail: &'a str, fix: &'a str },
 }
 
 #[derive(Serialize, Clone, Copy, PartialEq, Debug)]
@@ -96,12 +106,12 @@ impl Outcome {
     }
 }
 
-struct Out {
+pub(crate) struct Out {
     json: bool,
 }
 
 impl Out {
-    fn emit(&self, event: &Event, text: impl FnOnce() -> String) {
+    pub(crate) fn emit(&self, event: &Event, text: impl FnOnce() -> String) {
         let line = if self.json { serde_json::to_string(event).expect("events serialize") } else { text() };
         let mut stdout = std::io::stdout().lock();
         let _ = writeln!(stdout, "{line}");
@@ -240,11 +250,27 @@ async fn send(out: &Out, to: &str, timeout: u64, files: Vec<PathBuf>) -> anyhow:
     Ok(outcome.exit())
 }
 
+// XDG_DOWNLOAD_DIR from the environment, then from ~/.config/user-dirs.dirs, then ~/Downloads.
+fn resolve_download_dir(dir: Option<PathBuf>) -> anyhow::Result<PathBuf> {
+    if let Some(dir) = dir.or_else(|| std::env::var_os("XDG_DOWNLOAD_DIR").map(PathBuf::from)) {
+        return Ok(dir);
+    }
+    let home = PathBuf::from(std::env::var_os("HOME").context("no download folder: pass --dir")?);
+    let config = std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from).unwrap_or_else(|| home.join(".config"));
+    let from_user_dirs = std::fs::read_to_string(config.join("user-dirs.dirs")).ok().and_then(|text| {
+        text.lines().find_map(|line| {
+            let value = line.trim().strip_prefix("XDG_DOWNLOAD_DIR=")?.trim_matches('"');
+            Some(match value.strip_prefix("$HOME") {
+                Some(rest) => home.join(rest.trim_start_matches('/')),
+                None => PathBuf::from(value),
+            })
+        })
+    });
+    Ok(from_user_dirs.unwrap_or_else(|| home.join("Downloads")))
+}
+
 fn download_dir(dir: Option<PathBuf>) -> anyhow::Result<PathBuf> {
-    let dir = dir
-        .or_else(|| std::env::var_os("XDG_DOWNLOAD_DIR").map(PathBuf::from))
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join("Downloads")))
-        .context("no download folder: pass --dir")?;
+    let dir = resolve_download_dir(dir)?;
     std::fs::create_dir_all(&dir).with_context(|| format!("cannot create {}", dir.display()))?;
     Ok(dir)
 }
@@ -320,6 +346,10 @@ async fn main() -> ExitCode {
         Command::Browse { timeout } => browse(&out, timeout).await,
         Command::Send { to, timeout, files } => send(&out, &to, timeout, files).await,
         Command::Receive { dir, yes, once, port } => receive(&out, dir, yes, once, port).await,
+        Command::Doctor { dir, port } => match resolve_download_dir(dir) {
+            Ok(dir) => Ok(doctor::run(&out, port, &dir).await),
+            Err(e) => Err(e),
+        },
     };
     result.unwrap_or_else(|e| {
         eprintln!("quickshare: {e:#}");

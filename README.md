@@ -39,7 +39,22 @@ quickshare receive
 
 `send --to` takes a device name, which it matches without regard to case, or the id that `browse` printed. It waits up to 120 seconds for the device to appear and for its owner to tap Accept. Change that with `--timeout`. It prints byte progress while it sends.
 
-`receive` makes the computer visible and saves files to `$XDG_DOWNLOAD_DIR`, or `~/Downloads` when that is unset. Choose another folder with `--dir`. For each incoming transfer it prints the sender's name and a PIN, which matches the PIN on the phone. In a terminal it asks before accepting. Without a terminal it declines every transfer, unless you pass `--yes`, so a stranger nearby cannot write files to the computer. `--once` exits after the first finished transfer.
+`receive` makes the computer visible and saves files to the Download folder named in `$XDG_DOWNLOAD_DIR` or `~/.config/user-dirs.dirs`, or `~/Downloads` when neither names one. Choose another folder with `--dir`. For each incoming transfer it prints the sender's name and a PIN, which matches the PIN on the phone. In a terminal it asks before accepting. Without a terminal it declines every transfer, unless you pass `--yes`, so a stranger nearby cannot write files to the computer. `--once` exits after the first finished transfer.
+
+## Check the setup
+
+```sh
+quickshare doctor
+```
+
+`doctor` prints one line per check, with the command that fixes it. It exits 1 when a check fails.
+
+- **bluetooth** warns when no adapter answers over BlueZ or the adapter is off. Sending still works to a phone whose Quick Share screen is open.
+- **firewall** fails when ufw is enabled and drops incoming TCP on the receive port. It reads the ufw rule files and checks no other firewall.
+- **downloads** fails when the folder `receive` would write to is not writable.
+- **phone** runs only for phones connected over adb. It warns when the Mosey app described below is enabled.
+
+Pass `--port` and `--dir` to check the values you give `receive`.
 
 ### Exit status of send
 

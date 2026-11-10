@@ -1504,6 +1504,7 @@ name = "quickshare"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bluer",
  "clap",
  "rqs_lib",
  "serde",
