@@ -43,7 +43,9 @@ While it listens, `browse` also sends the Bluetooth advertisement that wakes Qui
 
 `send --to` takes a device name, which it matches without regard to case, or the id that `browse` printed. It waits up to 120 seconds for the device to appear and for its owner to tap Accept. Change that with `--timeout`. It prints byte progress while it sends.
 
-`receive` makes the computer visible and saves files to the Download folder named in `$XDG_DOWNLOAD_DIR` or `~/.config/user-dirs.dirs`, or `~/Downloads` when neither names one. Choose another folder with `--dir`. For each incoming transfer it prints the sender's name and a PIN, which matches the PIN on the phone. In a terminal it asks before accepting. Without a terminal it declines every transfer, unless you pass `--yes`, so a stranger nearby cannot write files to the computer. `--once` exits after the first finished transfer.
+`receive` makes the computer visible and saves files to the Download folder named in `$XDG_DOWNLOAD_DIR` or `~/.config/user-dirs.dirs`, or `~/Downloads` when neither names one. Choose another folder with `--dir`. For each incoming transfer it prints the sender's name and a PIN, which matches the PIN on the phone. In a terminal it asks before accepting. Without a terminal it declines every transfer, unless you pass `--yes` or `--ask`, so a stranger nearby cannot write files to the computer. `--once` exits after the first finished transfer.
+
+`--ask PROGRAM` lets another program decide, for a receiver that runs without a terminal, such as a background service that asks with a desktop notification. For each incoming transfer, `receive` runs the program with `QUICKSHARE_FROM`, `QUICKSHARE_PIN`, `QUICKSHARE_FILES` (one name per line) and `QUICKSHARE_BYTES` set, and accepts the transfer only when the program exits 0. A program that has not exited after 60 seconds is stopped and the transfer is declined. Its standard output is discarded, so it cannot break the `--json` stream. Each program runs on its own, so a second transfer does not wait for the first answer.
 
 ## Check the setup
 

@@ -50,8 +50,13 @@ enum Command {
         #[arg(long)]
         dir: Option<PathBuf>,
         /// Accept every incoming transfer without asking.
-        #[arg(long)]
+        #[arg(long, conflicts_with = "ask")]
         yes: bool,
+        /// Run this program for each incoming transfer and accept it when the program exits 0.
+        /// It gets QUICKSHARE_FROM, QUICKSHARE_PIN, QUICKSHARE_FILES (one per line) and
+        /// QUICKSHARE_BYTES, and the transfer is declined if it has not exited after 60 seconds.
+        #[arg(long, value_name = "PROGRAM")]
+        ask: Option<PathBuf>,
         /// Exit after the first finished transfer.
         #[arg(long)]
         once: bool,
@@ -278,6 +283,13 @@ fn download_dir(dir: Option<PathBuf>) -> anyhow::Result<PathBuf> {
     Ok(dir)
 }
 
+const ASK_TIMEOUT: Duration = Duration::from_secs(60);
+
+fn answer(reply: &broadcast::Sender<ChannelMessage>, id: String, accept: bool) {
+    let action = if accept { ChannelAction::AcceptTransfer } else { ChannelAction::RejectTransfer };
+    let _ = reply.send(ChannelMessage { id, direction: ChannelDirection::FrontToLib, action: Some(action), ..Default::default() });
+}
+
 async fn ask(question: &str) -> bool {
     eprint!("{question} [y/N] ");
     let mut line = String::new();
@@ -285,10 +297,10 @@ async fn ask(question: &str) -> bool {
     stdin.read_line(&mut line).await.is_ok() && matches!(line.trim(), "y" | "Y" | "yes")
 }
 
-async fn receive(out: &Out, dir: Option<PathBuf>, yes: bool, once: bool, port: u16) -> anyhow::Result<ExitCode> {
+async fn receive(out: &Out, dir: Option<PathBuf>, yes: bool, asker: Option<PathBuf>, once: bool, port: u16) -> anyhow::Result<ExitCode> {
     let dir = download_dir(dir)?;
     let dir_text = dir.to_string_lossy().into_owned();
-    let interactive = !yes && std::io::stdin().is_terminal();
+    let interactive = !yes && asker.is_none() && std::io::stdin().is_terminal();
     let mut rqs = RQS::new(Visibility::Visible, Some(port.into()), Some(dir));
     rqs.run().await?;
     let mut messages = rqs.message_sender.subscribe();
@@ -313,10 +325,26 @@ async fn receive(out: &Out, dir: Option<PathBuf>, yes: bool, once: bool, port: u
                 out.emit(&Event::Request { id: &m.id, from, pin, files: &names, bytes: meta.total_bytes }, || {
                     format!("{from} wants to send {} ({} bytes), PIN {pin}", names.join(", "), meta.total_bytes)
                 });
-                let accept = yes || (interactive && ask("Accept?").await);
-                files.insert(m.id.clone(), names);
-                let action = if accept { ChannelAction::AcceptTransfer } else { ChannelAction::RejectTransfer };
-                let _ = reply.send(ChannelMessage { id: m.id.clone(), direction: ChannelDirection::FrontToLib, action: Some(action), ..Default::default() });
+                files.insert(m.id.clone(), names.clone());
+                if let Some(program) = &asker {
+                    // The program may wait on a person, so it answers on its own task and later
+                    // transfers are not held up behind it.
+                    let mut command = tokio::process::Command::new(program);
+                    command.env("QUICKSHARE_FROM", from).env("QUICKSHARE_PIN", pin)
+                        .env("QUICKSHARE_FILES", names.join("\n")).env("QUICKSHARE_BYTES", meta.total_bytes.to_string())
+                        .stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).kill_on_drop(true);
+                    let (id, reply) = (m.id.clone(), reply.clone());
+                    tokio::spawn(async move {
+                        let accept = match command.spawn() {
+                            Ok(mut child) => matches!(tokio::time::timeout(ASK_TIMEOUT, child.wait()).await, Ok(Ok(s)) if s.success()),
+                            Err(e) => { eprintln!("quickshare: could not run the --ask program: {e}"); false }
+                        };
+                        answer(&reply, id, accept);
+                    });
+                } else {
+                    let accept = yes || (interactive && ask("Accept?").await);
+                    answer(&reply, m.id.clone(), accept);
+                }
             }
             State::ReceivingFiles => out.emit(&Event::Progress { id: &m.id, done: meta.ack_bytes, total: meta.total_bytes },
                 || format!("{} / {} bytes", meta.ack_bytes, meta.total_bytes)),
@@ -348,7 +376,7 @@ async fn main() -> ExitCode {
     let result = match cli.command {
         Command::Browse { timeout, no_wake } => browse(&out, timeout, !no_wake).await,
         Command::Send { to, timeout, files } => send(&out, &to, timeout, files).await,
-        Command::Receive { dir, yes, once, port } => receive(&out, dir, yes, once, port).await,
+        Command::Receive { dir, yes, ask, once, port } => receive(&out, dir, yes, ask, once, port).await,
         Command::Doctor { dir, port } => match resolve_download_dir(dir) {
             Ok(dir) => Ok(doctor::run(&out, port, &dir).await),
             Err(e) => Err(e),
