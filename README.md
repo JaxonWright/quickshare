@@ -39,6 +39,8 @@ quickshare receive
 
 `browse` listens for 10 seconds and prints each device it finds. Change that with `--timeout`. The phone has to be visible to the computer, which usually means its Quick Share screen is open or its visibility is set to Everyone. With the screen open, a Pixel 11 Pro Fold appeared within 1.5 seconds in testing.
 
+While it listens, `browse` also sends the Bluetooth advertisement that wakes Quick Share on nearby phones. `--no-wake` leaves it out and only listens, for a program that browses on a timer, such as a file manager's device list, and should not wake every phone in range each time. `send` always wakes the phone it looks for.
+
 `send --to` takes a device name, which it matches without regard to case, or the id that `browse` printed. It waits up to 120 seconds for the device to appear and for its owner to tap Accept. Change that with `--timeout`. It prints byte progress while it sends.
 
 `receive` makes the computer visible and saves files to the Download folder named in `$XDG_DOWNLOAD_DIR` or `~/.config/user-dirs.dirs`, or `~/Downloads` when neither names one. Choose another folder with `--dir`. For each incoming transfer it prints the sender's name and a PIN, which matches the PIN on the phone. In a terminal it asks before accepting. Without a terminal it declines every transfer, unless you pass `--yes`, so a stranger nearby cannot write files to the computer. `--once` exits after the first finished transfer.
@@ -112,6 +114,7 @@ The phone's settings have no switch for this. There are two workarounds:
 - The sender now reads the phone's frames between chunks. It answers keep-alive frames and stops when the phone sends a payload cancel or error control message. Upstream rejected those control messages as malformed.
 - A declined or expired consent prompt now ends in `Rejected` instead of `Disconnected`.
 - A send that fails after the connection opens now reports itself as an outbound transfer, so a client can tell which transfer failed.
+- `RQS::discovery` in `src/lib.rs` takes a `wake` argument. When it is false, discovery browses mDNS without starting the Bluetooth advertiser.
 
 ## License
 

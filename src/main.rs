@@ -31,6 +31,9 @@ enum Command {
     Browse {
         #[arg(long, default_value_t = 10)]
         timeout: u64,
+        /// Listen only, without the Bluetooth advertisement that wakes nearby phones.
+        #[arg(long)]
+        no_wake: bool,
     },
     /// Send files to a device found by `browse`, by its id or name.
     Send {
@@ -154,11 +157,11 @@ fn is_lib_message(m: &ChannelMessage, rtype: TransferType) -> bool {
     m.direction == ChannelDirection::LibToFront && m.rtype.as_ref() == Some(&rtype)
 }
 
-async fn browse(out: &Out, timeout: u64) -> anyhow::Result<ExitCode> {
+async fn browse(out: &Out, timeout: u64, wake: bool) -> anyhow::Result<ExitCode> {
     let mut rqs = RQS::new(Visibility::Invisible, None, None);
     rqs.run().await?;
     let (tx, mut rx) = broadcast::channel(64);
-    rqs.discovery(tx)?;
+    rqs.discovery(tx, wake)?;
 
     let deadline = Instant::now() + Duration::from_secs(timeout);
     let mut seen: HashMap<String, Device> = HashMap::new();
@@ -199,7 +202,7 @@ async fn send(out: &Out, to: &str, timeout: u64, files: Vec<PathBuf>) -> anyhow:
     let (sender, _) = rqs.run().await?;
     let mut messages = rqs.message_sender.subscribe();
     let (tx, mut found) = broadcast::channel(64);
-    rqs.discovery(tx)?;
+    rqs.discovery(tx, true)?;
 
     let deadline = Instant::now() + Duration::from_secs(timeout);
     let outcome = 'run: {
@@ -343,7 +346,7 @@ async fn main() -> ExitCode {
     let cli = Cli::parse();
     let out = Out { json: cli.json };
     let result = match cli.command {
-        Command::Browse { timeout } => browse(&out, timeout).await,
+        Command::Browse { timeout, no_wake } => browse(&out, timeout, !no_wake).await,
         Command::Send { to, timeout, files } => send(&out, &to, timeout, files).await,
         Command::Receive { dir, yes, once, port } => receive(&out, dir, yes, once, port).await,
         Command::Doctor { dir, port } => match resolve_download_dir(dir) {

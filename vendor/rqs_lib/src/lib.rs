@@ -162,6 +162,7 @@ impl RQS {
     pub fn discovery(
         &mut self,
         sender: broadcast::Sender<EndpointInfo>,
+        wake: bool,
     ) -> Result<(), anyhow::Error> {
         let tracker = self
             .tracker
@@ -171,8 +172,10 @@ impl RQS {
         let ctk = CancellationToken::new();
         self.discovery_ctk = Some(ctk.clone());
 
+        #[cfg(not(all(feature = "experimental", target_os = "linux")))]
+        let _ = wake;
         #[cfg(all(feature = "experimental", target_os = "linux"))]
-        {
+        if wake {
             let ctk_blea = ctk.clone();
             tracker.spawn(async move {
                 let blea = match BleAdvertiser::new().await {
